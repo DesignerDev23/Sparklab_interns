@@ -1,0 +1,2 @@
+[2025-03-01 13:20:19] Error sending email: SMTP Error: The following recipients failed: binabdulkadir456@gmail.com: <no-reply@sparklabhub.com>: Sender address rejected: not owned by user contact@sparklabhub.com
+
