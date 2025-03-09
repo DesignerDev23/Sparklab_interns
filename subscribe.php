@@ -8,7 +8,7 @@ session_start();
 if (!isset($_SESSION['email'])) {
     // Redirect the user to the login page
     header("Location: index.php");
-    exit(); // Stop further execution
+    exit();
 }
 
 // Check if the user is logged in
@@ -22,17 +22,37 @@ if ($result && $result->num_rows > 0) {
     $registrationId = $row['id'];
     $profilePhoto = $row['profile_picture'];
     $siwesDuration = $row['duration']; // Assuming this field exists
+    $hubManagerApproval = $row['hub_manager_approval']; // Approval status
     $monthlyRate = 30000; // Monthly rate in Naira
     $totalAmount = $monthlyRate * $siwesDuration; // Calculate total amount based on duration
 
     // Store necessary session variables
-    $_SESSION['intern_id'] = $registrationId; // Store the intern id in the session
-    $_SESSION['siwes_duration'] = $siwesDuration; // Store the SIWES duration
+    $_SESSION['intern_id'] = $registrationId;
+    $_SESSION['siwes_duration'] = $siwesDuration;
+
+    // Check payment history
+    $paymentSql = "SELECT SUM(amount) as total_paid FROM intern_subscriptions WHERE intern_id = ?";
+    $stmt = $conn->prepare($paymentSql);
+    $stmt->bind_param("i", $registrationId);
+    $stmt->execute();
+    $paymentResult = $stmt->get_result();
+    $paidAmount = 0;
+
+    if ($paymentResult && $paymentResult->num_rows > 0) {
+        $paymentRow = $paymentResult->fetch_assoc();
+        $paidAmount = $paymentRow['total_paid'] ?? 0;
+
+    }
+
+    // Calculate outstanding balance
+    $outstandingAmount = $totalAmount - $paidAmount;
 
     // Close the database connection
+    $stmt->close();
     $conn->close();
 }
 ?>
+
 
 
 <!DOCTYPE html>
@@ -219,7 +239,7 @@ if ($result && $result->num_rows > 0) {
                           </div>
                           <div class="flex-grow-1">
                           <span class="fw-medium d-block"><?php echo $fullName; ?></span>
-                          <small class="text-muted">Subscriber</small>
+                          <small class="text-muted">SPK Intern</small>
                           </div>
                         </div>
                       </a>
@@ -269,76 +289,100 @@ if ($result && $result->num_rows > 0) {
             <!-- Content wrapper -->
             <div class="content-wrapper">
               <!-- Content -->
-  
               <div class="container-xxl flex-grow-1 container-p-y">
-                <div class="row">
-                  <div class="col-lg-12 mb-4 order-0">
-                    <div class="card">
-                      <div class="d-flex align-items-end row">
-                        <div class="col-sm-7">
-                          <div class="card-body">
-                          <h5 class="mb-4">Congratulations <?php echo $fullName; ?> 🎉</h5>
-                          <p>Welcome back! Your SIWES duration is <?php echo $siwesDuration; ?> month(s).</p>
-                          <p>Total Amount: NGN <?php echo number_format($totalAmount, 2); ?></p>
-  
+    <div class="row">
+        <div class="col-lg-12 mb-4 order-0">
+            <div class="card">
+                <div class="d-flex align-items-end row">
+                    <div class="col-sm-7">
+                        <div class="card-body">
+                            <h5 class="mb-4">Congratulations <?php echo $fullName; ?> 🎉</h5>
+                            <p>Welcome back! Your SIWES duration is <?php echo $siwesDuration; ?> month(s).</p>
+                            <p>Total Amount: NGN <?php echo number_format($totalAmount, 2); ?></p>
                             <a href="javascript:;" class="btn btn-sm btn-outline-primary">View Badges</a>
-                          </div>
                         </div>
-                        <div class="col-sm-5 text-center text-sm-left">
-                          <div class="card-body pb-0 px-0 px-md-4">
-                            <img
-                              src="assets/img/illustrations/man-with-laptop-light.png"
-                              height="140"
-                              alt="View Badge User"
-                              data-app-dark-img="illustrations/man-with-laptop-dark.png"
-                              data-app-light-img="illustrations/man-with-laptop-light.png" />
-                          </div>
-                        </div>
-                      </div>
                     </div>
-                  </div>
-
-                  <!-- Total Revenue -->
-                                  
+                    <div class="col-sm-5 text-center text-sm-left">
+                        <div class="card-body pb-0 px-0 px-md-4">
+                            <img src="assets/img/illustrations/man-with-laptop-light.png" height="140" alt="View Badge User"
+                                data-app-dark-img="illustrations/man-with-laptop-dark.png"
+                                data-app-light-img="illustrations/man-with-laptop-light.png" />
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
 
-
-                <div class="col-xxl">
-                  <div class="card mb-4">
-                    <div class="card-header d-flex align-items-center justify-content-between">
-                      <h5 class="mb-0">Subscription</h5>
-                      <small class="text-muted float-end">Make a new Subscription</small>
-                    </div>
-                    <div class="card-body">
-                    <form id="internSubscriptionForm" method="POST">
-                    <input type="hidden" name="amount" value="<?php echo $totalAmount; ?>">
-                    
-                    <div class="row mb-3">
-                        <label class="col-sm-2 col-form-label" for="registrationId">Registration ID</label>
-                        <div class="col-sm-10">
-                            <input type="text" id="registrationId" name="registrationId" value="<?php echo $registrationId; ?>" class="form-control" readonly>
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <label class="col-sm-2 col-form-label" for="email">Email</label>
-                        <div class="col-sm-10">
-                            <input type="email" id="email" name="email" value="<?php echo $email; ?>" class="form-control" readonly>
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <label class="col-sm-2 col-form-label">Payment</label>
-                        <div class="col-sm-10">
-                            <button type="button" id="paystackBtn" class="btn btn-primary">Make Payment</button>
-                        </div>
-                    </div>
-                </form>
-                  </div>
+    <!-- Display Approval Message -->
+    <?php if ($hubManagerApproval !== 'approved') : ?>
+        <div class="alert alert-warning">
+            🚫 Your registration is pending approval. Please wait for the hub manager to approve your application.
+        </div>
+    <?php else : ?>
+        <div class="col-xxl">
+            <div class="card mb-4">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0">Subscription</h5>
+                    <small class="text-muted float-end">Make a new Subscription</small>
                 </div>
-                </div>
+                <div class="card-body">
+                    <!-- Check if Payment is Completed -->
+                    <?php if ($outstandingAmount <= 0) : ?>
+                        <div class="alert alert-success">
+                            ✅ Congratulations! You have completed your internship payment.
+                        </div>
+                    <?php else : ?>
+                        <!-- Display Outstanding Balance -->
+                        <div class="alert alert-info">
+                            💰 You have paid NGN <?php echo number_format($paidAmount, 2); ?>.
+                            Outstanding balance: NGN <?php echo number_format($outstandingAmount, 2); ?>.
+                        </div>
 
-              </div>
+                        <form id="internSubscriptionForm" method="POST">
+                            <input type="hidden" name="totalAmount" value="<?php echo $totalAmount; ?>">
+
+                            <div class="row mb-3">
+                                <label class="col-sm-2 col-form-label" for="registrationId">Registration ID</label>
+                                <div class="col-sm-10">
+                                    <input type="text" id="registrationId" name="registrationId" value="<?php echo $registrationId; ?>"
+                                        class="form-control" readonly>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-2 col-form-label" for="email">Email</label>
+                                <div class="col-sm-10">
+                                    <input type="email" id="email" name="email" value="<?php echo $email; ?>" class="form-control" readonly>
+                                </div>
+                            </div>
+
+                            <!-- Payment Type Selection -->
+                            <div class="row mb-3">
+                                <label class="col-sm-2 col-form-label" for="paymentType">Payment Type</label>
+                                <div class="col-sm-10">
+                                    <select id="paymentType" name="paymentType" class="form-control">
+                                        <option value="one-time">One-Time Payment (₦<?php echo number_format($totalAmount); ?>)</option>
+                                        <option value="split">Split Payment (₦<?php echo number_format($monthlyRate); ?> per month)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <input type="hidden" id="payAmount" name="payAmount" value="<?php echo $totalAmount; ?>">
+
+                            <div class="row mb-3">
+                                <label class="col-sm-2 col-form-label">Payment</label>
+                                <div class="col-sm-10">
+                                    <button type="button" id="paystackBtn" class="btn btn-primary">Make Payment</button>
+                                </div>
+                            </div>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+</div>
                 
                 
               <!-- / Content -->
@@ -406,54 +450,58 @@ if ($result && $result->num_rows > 0) {
 
 
     <script>
-        document.getElementById('paystackBtn').addEventListener('click', function() {
-            var email = document.getElementById('email').value;
-            var amount = document.querySelector('input[name="amount"]').value;
+document.getElementById('paymentType').addEventListener('change', function() {
+    var totalAmount = document.querySelector('input[name="totalAmount"]').value;
+    var monthlyRate = <?php echo $monthlyRate; ?>;
+    var selectedPaymentType = this.value;
+    
+    // Set amount based on payment type
+    var amountToPay = selectedPaymentType === 'one-time' ? totalAmount : monthlyRate;
+    document.getElementById('payAmount').value = amountToPay;
+});
 
-            // Initialize Paystack
-            var handler = PaystackPop.setup({
-                key: 'pk_test_12658c234f2075a824b3e5862ac5a6b31fc5cd4f', // Your Paystack public key
-                email: email,
-                amount: amount * 100, // Paystack requires amount in kobo
-                currency: 'NGN',
-                ref: 'INTERN_' + Math.floor((Math.random() * 1000000000) + 1), // Generate a unique reference
-                onClose: function() {
-                    alert('Payment closed');
-                },
-                callback: function(response) {
-                    // Handle successful payment
-                    var paymentReference = response.reference;
+document.getElementById('paystackBtn').addEventListener('click', function() {
+    var email = document.getElementById('email').value;
+    var amount = document.getElementById('payAmount').value;
 
-                    // Proceed to form submission
-                    submitForm(email, amount, paymentReference);
-                }
-            });
-            handler.openIframe();
-        });
+    var handler = PaystackPop.setup({
+        key: 'pk_test_12658c234f2075a824b3e5862ac5a6b31fc5cd4f', // Your Paystack public key
+        email: email,
+        amount: amount * 100, // Convert to kobo
+        currency: 'NGN',
+        ref: 'INTERN_' + Math.floor((Math.random() * 1000000000) + 1), 
+        onClose: function() {
+            alert('Payment closed');
+        },
+        callback: function(response) {
+            var paymentReference = response.reference;
+            submitForm(email, amount, paymentReference);
+        }
+    });
+    handler.openIframe();
+});
 
-        // Function to submit form data after successful payment
-        function submitForm(email, amount, paymentReference) {
+// Function to submit payment details
+function submitForm(email, amount, paymentReference) {
     var formData = new FormData();
     formData.append('email', email);
     formData.append('amount', amount);
-    formData.append('paymentReference', paymentReference); // Ensure this is included
+    formData.append('paymentReference', paymentReference);
+    formData.append('paymentType', document.getElementById('paymentType').value); // Include payment type
 
-    // Send form data to server
     var xhr = new XMLHttpRequest();
     xhr.open('POST', 'process_subscription.php', true);
     xhr.onload = function() {
         if (xhr.status === 200) {
-            // Handle success
-            console.log(xhr.responseText);
             alert('Subscription successful!');
-            window.location.href = 'dashboard.php'; // Redirect to dashboard or another relevant page
+            window.location.href = 'dashboard.php'; 
         } else {
-            // Handle errors
-            console.error('Error occurred while processing subscription: ' + xhr.statusText);
+            console.error('Error processing subscription: ' + xhr.statusText);
         }
     };
     xhr.send(formData);
 }
+
     </script>
 
 

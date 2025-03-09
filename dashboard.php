@@ -21,12 +21,15 @@ if ($result && $result->num_rows > 0) {
     $fullName = $row['full_name'];
     $internId = $row['id'];
     $profileComplete = $row['profile_complete']; // Check profile completeness
+    $approvalStatus = $row['hub_manager_approval'];
 } else {
     die('Intern not found.');
 }
 
-// Fetch subscriptions for the intern
+// Fetch all subscription details and calculate total amount spent
 $subscriptions = [];
+$totalSpent = 0; // Initialize total amount spent
+
 $sqlSubscriptions = "SELECT * FROM intern_subscriptions WHERE intern_id = ? ORDER BY expiration_date ASC";
 $stmtSubscriptions = $conn->prepare($sqlSubscriptions);
 $stmtSubscriptions->bind_param("i", $internId);
@@ -35,6 +38,7 @@ $resultSubscriptions = $stmtSubscriptions->get_result();
 
 while ($subscription = $resultSubscriptions->fetch_assoc()) {
     $subscriptions[] = $subscription;
+    $totalSpent += $subscription['amount']; // Sum up the total spent
 }
 
 // Close the database connection
@@ -330,25 +334,46 @@ $conn->close();
   
               <div class="container-xxl flex-grow-1 container-p-y">
               <div class="row mb-4">
-                  <div class="col-lg-12">
-                      <div class="card">
-                          <div class="card-body d-flex justify-content-between align-items-center">
-                              <?php if ($profileComplete == 0): ?>
-                                  <div>
-                                      <h4 class="alert-heading">Your profile is incomplete!</h4>
-                                      <p>Please complete your profile to enjoy all features.</p>
-                                  </div>
-                                  <a href="complete_profile" class="btn btn-primary">Complete Your Profile</a>
-                              <?php else: ?>
-                                  <div>
-                                      <h5 class="card-title">Profile Status</h5>
-                                      <p class="card-text">Your profile is complete. Enjoy all features!</p>
-                                  </div>
-                              <?php endif; ?>
-                          </div>
-                      </div>
-                  </div>
+              <div class="col-lg-12">
+    <div class="card">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <?php
+            // Fetch approval status from the database
+            $approvalStatus = $row['hub_manager_approval']; 
+
+            if ($profileComplete == 0): ?>
+                <div>
+                    <h4 class="alert-heading text-secondary">Your profile is incomplete!</h4>
+                    <p>Please complete your profile to enjoy all features.</p>
+                </div>
+                <a href="complete_profile.php" class="btn btn-primary">Complete Profile</a>
+
+            <?php elseif ($approvalStatus === 'pending'): ?>
+                <div>
+                    <h4 class="alert-heading text-warning">Your profile is under review!</h4>
+                    <p>Your profile has been submitted and is awaiting Hub Manager approval.</p>
+                </div>
+
+            <?php elseif ($approvalStatus === 'rejected'): ?>
+                <div>
+                    <h4 class="alert-heading text-danger">Your profile was rejected!</h4>
+                    <p>Please update your information and resubmit your profile.</p>
+                </div>
+                <a href="complete_profile.php" class="btn btn-danger">Update Profile</a>
+
+            <?php elseif ($approvalStatus === 'approved' && $profileComplete == 1): ?>
+                <div>
+                    <h5 class="card-title text-success">Profile Approved ✅</h5>
+                    <p class="card-text">Your profile is complete. Enjoy all features!</p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+
               </div>
+
                 <div class="row">
                   <div class="col-lg-12 mb-4 order-0">
                     <div class="card">
@@ -396,20 +421,19 @@ $conn->close();
                                       </div>
                                   </div>
                               </div>
-                                                              <span class="fw-medium d-block mb-1">Subscription Status</span>
-                                                              <h3 class="card-title mb-2">
-                                                                <?php
-                                                              if (!empty($subscriptions)) {
-                                    foreach ($subscriptions as $subscription) {
-                                        // Display subscription details
-                                        echo "<p> " . $subscription['expiration_date'] . "</p>";
+                              <span class="fw-medium d-block mb-1">Subscription Status</span>
+                                <h3 class="card-title mb-2">
+                                    <?php
+                                    if (!empty($subscriptions)) {
+                                        // Get only the last subscription (most recent)
+                                        $recentSubscription = end($subscriptions);
+                                        echo "<p>" . $recentSubscription['expiration_date'] . "</p>";
+                                    } else {
+                                        // No subscriptions found
+                                        echo "Don't have an active subscription";
                                     }
-                                } else {
-                                    // No subscriptions found
-                                    echo "Don't have and active Subsciption";
-                                }
-                                ?>
-                              </h3>
+                                    ?>
+                                </h3>
                               <small class="text-success fw-medium" id="expirationCountdown"></small>
                           </div>
                       </div>
@@ -444,8 +468,8 @@ $conn->close();
                               </div>
                             </div>
                             <span class="fw-medium d-block mb-1">Total Spent</span>
-                            <h3 class="card-title mb-2">0.00</h3>
-                            <small class="text-success fw-medium"><!-- <i class="bx bx-up-arrow-alt"></i> -->+0.80%</small>
+                            <h3 class="card-title mb-2"><?php echo number_format($totalSpent, 2); ?></h3>
+                            <!-- <small class="text-success fw-medium"><i class="bx bx-up-arrow-alt"></i>+0.80%</small> -->
                           </div>
                         </div>
                       </div>
@@ -458,7 +482,7 @@ $conn->close();
                     <div class="card h-100">
                         <div class="card-header d-flex align-items-center justify-content-between pb-0">
                             <div class="card-title mb-0">
-                                <h5 class="m-0 me-2">Subscrptions</h5>
+                                <h5 class="m-0 me-2">Recent Subscrptions</h5>
                                 <small class="text-muted">By Type</small>
                             </div>
                             <div class="dropdown">
@@ -477,26 +501,30 @@ $conn->close();
                                 
                             </div>
                             <ul class="p-0 m-0">
-                            <?php foreach ($subscriptions as $subscription): ?>
-                                  <li class="d-flex mb-4 pb-1">
-                                      <div class="avatar flex-shrink-0 me-3">
-                                          <span class="avatar-initial rounded bg-label-primary">
-                                              <i class="bx bx-dollar-circle"></i>
-                                          </span>
-                                      </div>
-                                      <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
-                                          <div class="me-2">
-                                              <h6 class="mb-0"><?php echo $subscription['subscription_duration']; ?></h6>
-                                              <small class="text-muted"><?php echo $subscription['expiration_date']; ?></small>
-                                          </div>
-                                          <div class="user-progress">
-                                              <small class="fw-medium">Approved</small>
-                                          </div>
-                                      </div>
-                                  </li>
-                              <?php endforeach; ?>
-                                <!-- Other list items -->
+                                <?php 
+                                // Get only the last 2 subscriptions (most recent)
+                                $recentSubscriptions = array_slice($subscriptions, -2); 
+
+                                foreach ($recentSubscriptions as $subscription): ?>
+                                    <li class="d-flex mb-4 pb-1">
+                                        <div class="avatar flex-shrink-0 me-3">
+                                            <span class="avatar-initial rounded bg-label-primary">
+                                                <i class="bx bx-dollar-circle"></i>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                            <div class="me-2">
+                                                <h6 class="mb-0">Internship Subscription</h6>
+                                                <small class="text-muted"><?php echo $subscription['expiration_date']; ?></small>
+                                            </div>
+                                            <div class="user-progress">
+                                                <small class="fw-medium">Approved</small>
+                                            </div>
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
                             </ul>
+
                         </div>
                     </div>
                 </div>
@@ -507,7 +535,7 @@ $conn->close();
                   <div class="col-md-6 col-lg-8 order-2 mb-4">
                     <div class="card h-100">
                       <div class="card-header d-flex align-items-center justify-content-between">
-                        <h5 class="card-title m-0 me-2">Transactions</h5>
+                        <h5 class="card-title m-0 me-2">Recent Transactions</h5>
                         <div class="dropdown">
                           <button
                             class="btn p-0"
@@ -526,25 +554,29 @@ $conn->close();
                         </div>
                       </div>
                       <div class="card-body">
-                        <ul class="p-0 m-0">
-                        <?php foreach ($subscriptions as $subscription): ?>
-                          <li class="d-flex mb-4 pb-1">
-                              <div class="avatar flex-shrink-0 me-3">
-                                  <img src="assets/img/icons/unicons/wallet.png" alt="User" class="rounded" />
-                              </div>
-                              <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
-                                  <div class="me-2">
-                                      <small class="text-muted d-block mb-1">Payment Reference</small>
-                                      <h6 class="mb-0"><?php echo $subscription['payment_reference']; ?></h6>
+                      <ul class="p-0 m-0">
+                          <?php 
+                          // Get only the last 2 subscriptions (most recent)
+                          $recentSubscriptions = array_slice($subscriptions, -3); 
+
+                          foreach ($recentSubscriptions as $subscription): ?>
+                              <li class="d-flex mb-4 pb-1">
+                                  <div class="avatar flex-shrink-0 me-3">
+                                      <img src="assets/img/icons/unicons/wallet.png" alt="User" class="rounded" />
                                   </div>
-                                  <div class="user-progress d-flex align-items-center gap-1">
-                                      <h6 class="mb-0"><?php echo $subscription['amount']; ?></h6>
-                                      <span class="text-muted">NGN</span>
+                                  <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                      <div class="me-2">
+                                          <small class="text-muted d-block mb-1">Payment Reference</small>
+                                          <h6 class="mb-0"><?php echo $subscription['payment_reference']; ?></h6>
+                                      </div>
+                                      <div class="user-progress d-flex align-items-center gap-1">
+                                          <h6 class="mb-0"><?php echo $subscription['amount']; ?></h6>
+                                          <span class="text-muted">NGN</span>
+                                      </div>
                                   </div>
-                              </div>
-                          </li>
-                      <?php endforeach; ?>
-                        </ul>
+                              </li>
+                          <?php endforeach; ?>
+                      </ul>
                       </div>
                     </div>
                   </div>

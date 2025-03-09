@@ -67,17 +67,115 @@ $conn->close();
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Check-in | Spark Lab Hub</title>
+    <meta name="description" content="" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="assets/img/favicon/favicon.ico" />
-    <link rel="stylesheet" href="assets/vendor/css/core.css" />
-    <link rel="stylesheet" href="assets/vendor/css/theme-default.css" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap"
+      rel="stylesheet" />
+
+    <link rel="stylesheet" href="assets/vendor/fonts/boxicons.css" />
+    <link rel="stylesheet" href="assets/vendor/libs/bs-stepper/bs-stepper.css" />
+    <!-- Core CSS -->
+    <link rel="stylesheet" href="assets/vendor/css/core.css" class="template-customizer-core-css" />
+    <link rel="stylesheet" href="assets/vendor/css/theme-default.css" class="template-customizer-theme-css" />
     <link rel="stylesheet" href="assets/css/demo.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js">
+    <!-- Vendors CSS -->
+    <link rel="stylesheet" href="assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css" />
+    <!-- Page CSS -->
+    <!-- Helpers -->
+    <script src="assets/vendor/js/helpers.js"></script>
+    <!--! Template customizer & Theme config files MUST be included after core stylesheets and helpers.js in the <head> section -->
+    <!--? Config:  Mandatory theme config file contain global vars & default theme options, Set your preferred theme option in this file.  -->
+    <script src="assets/js/config.js"></script>
 </head>
 <body>
     <div class="layout-wrapper layout-content-navbar">
         <div class="layout-container">
-            <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
-                <!-- Menu Content -->
-            </aside>
+        <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+            <div class="app-brand demo">
+              <a href="dashboard" class="app-brand-link">
+                <span class="app-brand-logo demo">
+
+                  </span>
+                <span class="app-brand-text demo menu-text fw-bold  ms-2 text-capitalize">Spark Lab Hub</span>
+
+              </a>
+  
+              <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto d-block d-xl-none">
+                <i class="bx bx-chevron-left bx-sm align-middle"></i>
+              </a>
+            </div>
+  
+            <div class="menu-inner-shadow"></div>
+  
+             <ul class="menu-inner py-1">
+              <!-- Dashboards -->
+              <li class="menu-item">
+                <a href="dashboard" class="menu-link ">
+                  <i class="menu-icon  bx bx-home-circle"></i>
+                  <div data-i18n="Dashboards">Dashboards</div>
+                  <!-- <div class="badge bg-danger rounded-pill ms-auto">5</div> -->
+                </a>
+          
+              </li>
+
+              <li class="menu-header small text-uppercase"><span class="menu-header-text">Subscription</span></li>
+       
+
+              <li class="menu-item ">
+                <a href="subscribe" class="menu-link ">
+                  <i class="menu-icon  bx bx-credit-card"></i>
+                  <div data-i18n="Dashboards">Subscribe</div>
+                  <!-- <div class="badge bg-danger rounded-pill ms-auto">5</div> -->
+                </a>
+              </li>
+
+             
+
+              <li class="menu-item active">
+                <a href="check_in" class="menu-link ">
+                  <i class="menu-icon  bx bx-log-in-circle"></i>
+                  <div data-i18n="Dashboards">Check-In</div>
+                  <!-- <div class="badge bg-danger rounded-pill ms-auto">5</div> -->
+                </a>
+              </li>
+
+              <!-- <li class="menu-item ">
+                <a href="active_user.php" class="menu-link ">
+                  <i class="menu-icon  bx bx-user-check"></i>
+                  <div data-i18n="Dashboards">Active Subscribers</div>
+                </a>
+              </li> -->
+              
+              <li class="menu-header small text-uppercase"><span class="menu-header-text">Activities</span></li>
+              <!-- Layouts -->
+              <li class="menu-item ">
+                <a href="generate_report.php" class="menu-link menu-toggle">
+                  <i class="menu-icon  bx bx-detail"></i>
+                  <div data-i18n="Dashboards">Calender</div>
+                </a>
+              </li>
+
+              <li class="menu-item ">
+                <a href="transactions" class="menu-link ">
+                  <i class="menu-icon  bx bx-credit-card"></i>
+                  <div data-i18n="Dashboards">Transactions</div>
+                  <!-- <div class="badge bg-danger rounded-pill ms-auto">5</div> -->
+                </a>
+              </li>
+             
+             
+  
+            
+       </aside>
 
             <div class="layout-page">
                 <nav class="layout-navbar container-xxl navbar navbar-expand-xl navbar-detached align-items-center bg-navbar-theme" id="layout-navbar">
