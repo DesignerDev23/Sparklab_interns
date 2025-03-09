@@ -193,12 +193,7 @@ $conn->close();
               
               <li class="menu-header small text-uppercase"><span class="menu-header-text">Activities</span></li>
               <!-- Layouts -->
-              <li class="menu-item ">
-                <a href="generate_report.php" class="menu-link menu-toggle">
-                  <i class="menu-icon  bx bx-detail"></i>
-                  <div data-i18n="Dashboards">Calender</div>
-                </a>
-              </li>
+
 
               <li class="menu-item ">
                 <a href="transactions" class="menu-link ">

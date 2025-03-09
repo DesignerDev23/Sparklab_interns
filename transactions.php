@@ -1,5 +1,5 @@
 <?php
-// Include your database configuration here
+// Include your database configuration
 include './config/config.php';
 
 // Start the session
@@ -7,56 +7,48 @@ session_start();
 
 // Check if the user is not logged in
 if (!isset($_SESSION['email'])) {
-    // Redirect to the login page
-    header("Location: index.php"); // Adjust the path based on your file structure
+    header("Location: index.php");
     exit();
 }
 
-// Fetch transactions for the specific subscriber
 $email = $_SESSION['email'];
 
-// Retrieve subscriber ID using the email
-// Retrieve user data from the database
-$email = $_SESSION['email'];
-$sql = "SELECT * FROM subscribers WHERE email = '$email'";
-$result = $conn->query($sql);
+// Retrieve intern data
+$sql = "SELECT * FROM interns WHERE email = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("s", $email);
+$stmt->execute();
+$result = $stmt->get_result();
 
-$subscriptions = []; // Initialize array to store subscriptions
+$subscriptions = [];
 
-if ($result && $result->num_rows > 0) {
+if ($result->num_rows > 0) {
     $row = $result->fetch_assoc();
     $fullName = $row['full_name'];
-    $profilePhoto = $row['profile_photo'];
+    $profilePhoto = $row['profile_picture'];
+    $internId = $row['id'];
 
-    // Fetch active subscription details for the dashboard
-    $subscriberId = $row['registration_id'];
-    $subscriptionSql = "SELECT * FROM subscriptions WHERE subscriber_id = '$subscriberId' AND expiration_date > NOW() ORDER BY expiration_date ASC";
-    $subscriptionResult = $conn->query($subscriptionSql);
+    // Fetch intern subscription details
+    $subscriptionSql = "SELECT * FROM intern_subscriptions WHERE intern_id = ? ORDER BY created_at DESC";
+    $subStmt = $conn->prepare($subscriptionSql);
+    $subStmt->bind_param("i", $internId);
+    $subStmt->execute();
+    $subscriptionResult = $subStmt->get_result();
 
-    if ($subscriptionResult && $subscriptionResult->num_rows > 0) {
-        while ($subscriptionRow = $subscriptionResult->fetch_assoc()) {
-            // Fetch subscription details
-            $subscriptionid = $subscriptionRow['id'];
-            $subscriptionDuration = $subscriptionRow['duration'];
-            $paymentReference = $subscriptionRow['payment_reference'];
-            $paymentStatus = $subscriptionRow['status'];
-            $amount = $subscriptionRow['amount'];
-            $creatAt = $subscriptionRow['created_at'];
-            
-            // Add subscription details to the array
-            $subscriptions[] = [
-                'id' => $subscriptionid,
-                'duration' => $subscriptionDuration,
-                'payment_reference' => $paymentReference,
-                'status' => $paymentStatus,
-                'amount' => $amount,
-                'created_at' => $creatAt
-            ];
-        }
+    while ($subscriptionRow = $subscriptionResult->fetch_assoc()) {
+        $subscriptions[] = [
+            'id' => $subscriptionRow['id'],
+            'amount' => number_format($subscriptionRow['amount'], 2),
+            'payment_reference' => $subscriptionRow['payment_reference'],
+            'status' => ucfirst($subscriptionRow['status']),
+            'created_at' => date("d M Y, H:i A", strtotime($subscriptionRow['created_at'])),
+        ];
     }
+
+    $subStmt->close();
 }
 
-// Close the database connection
+$stmt->close();
 $conn->close();
 ?>
 
@@ -138,6 +130,15 @@ $conn->close();
 
   </head>
 
+  <style>
+/* Modal Styling */
+.modal { display: none; position: fixed; z-index: 1000; padding-top: 100px; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+.modal-content { background-color: #fff; margin: auto; padding: 20px; border: 1px solid #888; width: 60%; }
+.close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.close:hover { color: black; }
+</style>
+
+
   <body>
     <!-- Content -->
     <div class="layout-wrapper layout-content-navbar">
@@ -212,12 +213,7 @@ $conn->close();
               
               <li class="menu-header small text-uppercase"><span class="menu-header-text">Activities</span></li>
               <!-- Layouts -->
-              <li class="menu-item ">
-                <a href="generate_report.php" class="menu-link menu-toggle">
-                  <i class="menu-icon  bx bx-detail"></i>
-                  <div data-i18n="Dashboards">Calender</div>
-                </a>
-              </li>
+
 
               <li class="menu-item active">
                 <a href="transactions" class="menu-link ">
@@ -278,7 +274,7 @@ $conn->close();
                  <li class="nav-item navbar-dropdown dropdown-user dropdown">
                   <a class="nav-link dropdown-toggle hide-arrow" href="javascript:void(0);" data-bs-toggle="dropdown">
                     <div class="avatar avatar-online">
-                    <img src="<?php echo $profilePhoto; ?>" alt="Profile Photo" class="w-px-40 h-40 rounded-circle" />
+                    <img src="./assets/img/avatars/boy.png" alt="Profile Photo" class="w-px-40 h-40 rounded-circle" />
                     </div>
                   </a>
                   <ul class="dropdown-menu dropdown-menu-end">
@@ -287,7 +283,7 @@ $conn->close();
                         <div class="d-flex">
                           <div class="flex-shrink-0 me-3">
                             <div class="avatar avatar-online">
-                            <img src="<?php echo $profilePhoto; ?>" alt="Profile Photo" class="w-px-40 h-40 rounded-circle" />
+                            <img src="./assets/img/avatars/boy.png" alt="Profile Photo" class="w-px-40 h-40 rounded-circle" />
                             </div>
                           </div>
                           <div class="flex-grow-1">
@@ -346,69 +342,72 @@ $conn->close();
               <div class="container-xxl flex-grow-1 container-p-y">
                 <div class="row">
                   <div class="col-lg-12 mb-4 order-0">
-                    <div class="card">
-                      <div class="d-flex align-items-end row">
-                        <div class="col-sm-7">
-                          <div class="card-body">
-                            <h5 class="card-title text-primary">Congratulations <?php echo $fullName; ?> 🎉</h5>
-                            <p class="mb-4">
-                              Welcome back to your personalized dashboard! We're excited to have you return and continue your journey with <span class="fw-medium">Spark Lab Hub</span>.
-                            </p>
-  
-                            <a href="javascript:;" class="btn btn-sm btn-outline-primary">View Badges</a>
+                      <div class="card">
+                          <div class="d-flex align-items-end row">
+                              <div class="col-sm-7">
+                                  <div class="card-body">
+                                      <h5 class="card-title text-primary">Congratulations <?php echo htmlspecialchars($fullName); ?> 🎉</h5>
+                                      <p class="mb-4">
+                                          Welcome back! Keep track of your payments below.
+                                      </p>
+                                  </div>
+                              </div>
+                              <div class="col-sm-5 text-center text-sm-left">
+                                  <div class="card-body pb-0 px-0 px-md-4">
+                                      <img src="assets/img/illustrations/man-with-laptop-light.png" height="140" alt="User Image"/>
+                                  </div>
+                              </div>
                           </div>
-                        </div>
-                        <div class="col-sm-5 text-center text-sm-left">
-                          <div class="card-body pb-0 px-0 px-md-4">
-                            <img
-                              src="assets/img/illustrations/man-with-laptop-light.png"
-                              height="140"
-                              alt="View Badge User"
-                              data-app-dark-img="illustrations/man-with-laptop-dark.png"
-                              data-app-light-img="illustrations/man-with-laptop-light.png" />
-                          </div>
-                        </div>
                       </div>
-                    </div>
-                  </div>                
-               
-                  
-                </div>
-                <div class="col-xxl">
-                  <div class="card mb-4">
-                    <div class="card-header align-items-center justify-content-between">
-                                <!-- Other list items -->
+                  </div>
+              </div>
 
-                  <table id="dataTable" class="datatables-basic">
-                    <thead>
-                        <tr>
-                            <th>id</th>
-                            <th>Amount</th>
-                            <th>Reference</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                            <th>Remark</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                      <?php foreach ($subscriptions as $subscription): ?>
-                          <tr>
-                              <td><?php echo $subscription['id']; ?></td>
-                              <td><?php echo $subscription['amount']; ?></td>
-                              <td><?php echo $subscription['payment_reference']; ?></td>
-                              <td><?php echo $subscription['status']; ?></td>
-                              <td><?php echo $subscription['created_at']; ?></td>
-                              <td>
-                                  <?php if (isset($subscription['id'])) { ?>
-                                      <button class="btn btn-primary" onclick="viewTransaction(<?php echo $subscription['id']; ?>)">Approved</button>
-                                  <?php } else { ?>
-                                      <span>N/A</span>
-                                  <?php } ?>
-                              </td>
-                          </tr>
-                      <?php endforeach; ?>
-                  </tbody>
-                </table>
+              <!-- Subscription Table -->
+                        <div class="col-xxl">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Payment History</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table id="dataTable" class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Amount (NGN)</th>
+                                                    <th>Reference</th>
+                                                    <th>Status</th>
+                                                    <th>Date</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($subscriptions as $subscription): ?>
+                                                    <tr>
+                                                        <td><?php echo $subscription['id']; ?></td>
+                                                        <td><?php echo $subscription['amount']; ?></td>
+                                                        <td><?php echo htmlspecialchars($subscription['payment_reference']); ?></td>
+                                                        <td><span class="badge bg-<?php echo ($subscription['status'] === 'Paid') ? 'success' : 'warning'; ?>"><?php echo $subscription['status']; ?></span></td>
+                                                        <td><?php echo $subscription['created_at']; ?></td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-primary view-transaction" data-id="<?php echo $subscription['id']; ?>">View</button>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                <!-- Modal for Transaction Details -->
+                <div id="transactionModal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <span class="close" onclick="closeModal()">&times;</span>
+                        <div id="transactionDetails"></div>
+                    </div>
                 </div>
               </div>
             </div>
@@ -482,59 +481,46 @@ $conn->close();
 	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
 
-    <script>
-      $(document).ready(function() {
-          var table = $('#dataTable').DataTable({
-              dom: 'Bfrtip',
-              buttons: [
-                  'copy', 'csv', 'excel', 'pdf', 'print'
-              ],
-              paging: true,
-              responsive: true 
-          });
+  <script>
+    $(document).ready(function() {
+        var table = $('#dataTable').DataTable({
+            dom: 'Bfrtip',
+            buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+            paging: true,
+            responsive: true
+        });
 
-          // Add event listener for view and delete buttons
-          $('#dataTable tbody').on('click', '.btn-view', function() {
-              var data = table.row($(this).parents('tr')).data();
-              alert('View clicked for: ' + data[0]);
-          });
+        // Handle transaction view button click
+        $('.view-transaction').on('click', function() {
+            var transactionId = $(this).data('id');
+            viewTransaction(transactionId);
+        });
+    });
 
-          $('#dataTable tbody').on('click', '.btn-delete', function() {
-              var data = table.row($(this).parents('tr')).data();
-              alert('Delete clicked for: ' + data[0]);
-          });
-      });
 
-      // Function to open the transaction modal and display details
-      function viewTransaction(transactionId) {
-          // You can fetch additional details from the server using AJAX if needed
-          // For simplicity, let's assume the transaction details are already available in PHP
-          var transactionDetails = '<?php echo json_encode($subscriptions); ?>';
-          transactionDetails = JSON.parse(transactionDetails);
-          
-          // Find the transaction with the given ID
-          var transaction = transactionDetails.find(function(item) {
-              return item.id === transactionId;
-          });
+    function viewTransaction(transactionId) {
+        var transactions = <?php echo json_encode($subscriptions); ?>;
+        var transaction = transactions.find(t => t.id == transactionId);
 
-          // Display the transaction details in the modal
-          var modalContent = "<h2>Transaction Details</h2>";
-          modalContent += "<p><strong>ID:</strong> " + transaction.id + "</p>";
-          modalContent += "<p><strong>Amount:</strong> " + transaction.amount + "</p>";
-          modalContent += "<p><strong>Reference:</strong> " + transaction.payment_reference + "</p>";
-          modalContent += "<p><strong>Status:</strong> " + transaction.status + "</p>";
-          modalContent += "<p><strong>Date:</strong> " + transaction.created_at + "</p>";
+        if (transaction) {
+            var modalContent = "<h2>Transaction Details</h2>";
+            modalContent += "<p><strong>ID:</strong> " + transaction.id + "</p>";
+            modalContent += "<p><strong>Amount:</strong> " + transaction.amount + " NGN</p>";
+            modalContent += "<p><strong>Reference:</strong> " + transaction.payment_reference + "</p>";
+            modalContent += "<p><strong>Status:</strong> " + transaction.status + "</p>";
+            modalContent += "<p><strong>Date:</strong> " + transaction.created_at + "</p>";
 
-          document.getElementById("transactionDetails").innerHTML = modalContent;
+            document.getElementById("transactionDetails").innerHTML = modalContent;
+            document.getElementById("transactionModal").style.display = "block";
+        }
+    }
 
-          // Show the modal
-          document.getElementById("transactionModal").style.display = "block";
-      }
-      function closeModal() {
-          document.getElementById("transactionModal").style.display = "none";
-      }
-
+    function closeModal() {
+        document.getElementById("transactionModal").style.display = "none";
+    }
   </script>
+
+
 
 
   </body>
